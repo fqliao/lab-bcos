@@ -27,12 +27,12 @@ using namespace dev;
 using namespace dev::blockverifier;
 using namespace dev::storage;
 
-const char* const ENTRYIES_METENTRYIY_METHOD_GETI_STR = "getInt(string)";
-const char* const ENTRYIY_METHOD_SET_STR_INT = "set(string,int256)";
-const char* const ENTRYIY_METHOD_SET_STR_STR = "set(string,string)";
-const char* const ENTRYIY_METHOD_GETA_STR = "getAddress(string)";
-const char* const ENTRYIY_METHOD_GETB_STR = "getBytes64(string)";
-const char* const ENTRYIY_METHOD_GETB_STR32 = "getBytes32(string)";
+const std::string ENTRYIES_METENTRYIY_METHOD_GETI_STR = "getInt(string)";
+const std::string ENTRYIY_METHOD_SET_STR_INT = "set(string,int256)";
+const std::string ENTRYIY_METHOD_SET_STR_STR = "set(string,string)";
+const std::string ENTRYIY_METHOD_GETA_STR = "getAddress(string)";
+const std::string ENTRYIY_METHOD_GETB_STR = "getBytes64(string)";
+const std::string ENTRYIY_METHOD_GETB_STR32 = "getBytes32(string)";
 
 EntryPrecompiled::EntryPrecompiled()
 {

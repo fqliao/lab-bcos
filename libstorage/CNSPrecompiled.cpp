@@ -29,9 +29,9 @@ using namespace dev;
 using namespace dev::blockverifier;
 using namespace dev::storage;
 
-const char* const CNS_METHOD_INS_STR4 = "insert(string,string,string,string)";
-const char* const CNS_METHOD_SLT_STR = "selectByName(string)";
-const char* const CNS_METHOD_SLT_STR2 = "selectByNameAndVersion(string,string)";
+const std::string CNS_METHOD_INS_STR4 = "insert(string,string,string,string)";
+const std::string CNS_METHOD_SLT_STR = "selectByName(string)";
+const std::string CNS_METHOD_SLT_STR2 = "selectByNameAndVersion(string,string)";
 
 CNSPrecompiled::CNSPrecompiled()
 {
@@ -58,13 +58,13 @@ Table::Ptr CNSPrecompiled::openTable(ExecutiveContext::Ptr context, const std::s
 bytes CNSPrecompiled::call(
     ExecutiveContext::Ptr context, bytesConstRef param, Address const& origin)
 {
-    STORAGE_LOG(TRACE) << "this: " << this << " call CNS:" << toHex(param);
+    STORAGE_LOG(TRACE) << "this: " << this << " call CNSPrecompiled [param=" << toHex(param) << "]";
 
     // parse function name
     uint32_t func = getParamFunc(param);
     bytesConstRef data = getParamData(param);
 
-    STORAGE_LOG(DEBUG) << "func:" << std::hex << func;
+    STORAGE_LOG(DEBUG) << "CNSPrecompiled call [func=" << std::hex << func << "]";
 
     dev::eth::ContractABI abi;
     bytes out;
@@ -77,27 +77,15 @@ bytes CNSPrecompiled::call(
         abi.abiOut(data, contractName, contractVersion, contractAddress, contractAbi);
         Table::Ptr table = openTable(context, SYS_CNS);
 
-        // check exist or not
-        bool exist = false;
-        auto entries = table->select(contractName, table->newCondition());
-        if (entries.get())
+        auto condition = table->newCondition();
+        condition->EQ(SYS_CNS_FIELD_VERSION, contractVersion);
+        auto entries = table->select(contractName, condition);
+        if (entries->size() != 0u)
         {
-            for (size_t i = 0; i < entries->size(); i++)
-            {
-                auto entry = entries->get(i);
-                if (!entry)
-                    continue;
-                if (entry->getField(SYS_CNS_FIELD_VERSION) == contractVersion)
-                {
-                    exist = true;
-                    break;
-                }
-            }
-        }
-        if (exist)
-        {
-            STORAGE_LOG(WARNING) << "CNS entry with same name and version has existed.";
-            out = abi.abiIn("", u256(0));
+            STORAGE_LOG(DEBUG)
+                << "The contractName and contractVersion already exist [contractName="
+                << contractName << ", contractVersion=" << contractVersion << "]";
+            out = abi.abiIn("", 0);
         }
         else
         {
@@ -108,7 +96,19 @@ bytes CNSPrecompiled::call(
             entry->setField(SYS_CNS_FIELD_ADDRESS, contractAddress);
             entry->setField(SYS_CNS_FIELD_ABI, contractAbi);
             int count = table->insert(contractName, entry, getOptions(origin));
-            out = abi.abiIn("", u256(count));
+            if (count == -1)
+            {
+                STORAGE_LOG(WARNING)
+                    << "CNSPrecompiled insert operation is not authorized [origin=" << origin.hex()
+                    << "]";
+            }
+            else
+            {
+                STORAGE_LOG(DEBUG)
+                    << "CNSPrecompiled insert operation is successful [contractName="
+                    << contractName << ", contractVersion=" << contractVersion << "]";
+            }
+            out = abi.abiIn("", count);
         }
     }
     else if (func == name2Selector[CNS_METHOD_SLT_STR])
@@ -179,7 +179,7 @@ bytes CNSPrecompiled::call(
     }
     else
     {
-        STORAGE_LOG(ERROR) << "error func:" << std::hex << func;
+        STORAGE_LOG(ERROR) << "CNSPrecompiled error [func=" << std::hex << func << "]";
     }
 
     return out;

@@ -167,9 +167,6 @@ int dev::storage::MemoryTable::insert(
             if (m_remoteDB)
             {
                 entries = m_remoteDB->select(m_blockHash, m_blockNum, m_tableInfo->name, key);
-
-                /// STORAGE_LOG(DEBUG) << "AMOPDB selects:" << entries->size() << " record(s)";
-
                 m_cache.insert(std::make_pair(key, entries));
             }
         }

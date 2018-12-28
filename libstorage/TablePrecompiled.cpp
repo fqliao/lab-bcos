@@ -30,12 +30,12 @@ using namespace dev;
 using namespace dev::blockverifier;
 using namespace dev::storage;
 
-const char* const TABLE_METHOD_SLT_STR_ADD = "select(string,address)";
-const char* const TABLE_METHOD_INS_STR_ADD = "insert(string,address)";
-const char* const TABLE_METHOD_NEWCOND = "newCondition()";
-const char* const TABLE_METHOD_NEWENT = "newEntry()";
-const char* const TABLE_METHOD_RE_STR_ADD = "remove(string,address)";
-const char* const TABLE_METHOD_UP_STR_2ADD = "update(string,address,address)";
+const std::string TABLE_METHOD_SLT_STR_ADD = "select(string,address)";
+const std::string TABLE_METHOD_INS_STR_ADD = "insert(string,address)";
+const std::string TABLE_METHOD_NEWCOND = "newCondition()";
+const std::string TABLE_METHOD_NEWENT = "newEntry()";
+const std::string TABLE_METHOD_RE_STR_ADD = "remove(string,address)";
+const std::string TABLE_METHOD_UP_STR_2ADD = "update(string,address,address)";
 
 
 TablePrecompiled::TablePrecompiled()
@@ -56,12 +56,13 @@ std::string TablePrecompiled::toString(std::shared_ptr<ExecutiveContext>)
 bytes TablePrecompiled::call(
     ExecutiveContext::Ptr context, bytesConstRef param, Address const& origin)
 {
-    STORAGE_LOG(DEBUG) << "call Table";
+    STORAGE_LOG(DEBUG) << "this: " << this << " call TablePrecompiled [param=" << toHex(param)
+                       << "]";
 
     uint32_t func = getParamFunc(param);
     bytesConstRef data = getParamData(param);
 
-    STORAGE_LOG(DEBUG) << "func:" << std::hex << func;
+    STORAGE_LOG(DEBUG) << "TablePrecompiled call [func=" << std::hex << func << "]";
 
     dev::eth::ContractABI abi;
 
@@ -96,7 +97,17 @@ bytes TablePrecompiled::call(
         auto entry = entryPrecompiled->getEntry();
 
         int count = m_table->insert(key, entry, getOptions(origin));
-        out = abi.abiIn("", u256(count));
+        if (count == -1)
+        {
+            STORAGE_LOG(WARNING) << "TablePrecompiled insert operation is not authorized [origin="
+                                 << origin.hex() << "]";
+        }
+        else
+        {
+            STORAGE_LOG(DEBUG) << "TablePrecompiled insert operation is successful [key=" << key
+                               << ", address=" << entryAddress.hex() << "]";
+        }
+        out = abi.abiIn("", count);
     }
     else if (func == name2Selector[TABLE_METHOD_NEWCOND])
     {  // newCondition()
@@ -128,6 +139,16 @@ bytes TablePrecompiled::call(
         auto condition = conditionPrecompiled->getCondition();
 
         int count = m_table->remove(key, condition, getOptions(origin));
+        if (count == -1)
+        {
+            STORAGE_LOG(WARNING) << "TablePrecompiled remove operation is not authorized [origin="
+                                 << origin.hex() << "]";
+        }
+        else
+        {
+            STORAGE_LOG(DEBUG) << "TablePrecompiled remove operation is successful [key=" << key
+                               << ", address=" << conditionAddress.hex() << "]";
+        }
         out = abi.abiIn("", u256(count));
     }
     else if (func == name2Selector[TABLE_METHOD_UP_STR_2ADD])
@@ -146,6 +167,17 @@ bytes TablePrecompiled::call(
         auto condition = conditionPrecompiled->getCondition();
 
         int count = m_table->update(key, entry, condition, getOptions(origin));
+        if (count == -1)
+        {
+            STORAGE_LOG(WARNING) << "TablePrecompiled update operation is not authorized [origin="
+                                 << origin.hex() << "]";
+        }
+        else
+        {
+            STORAGE_LOG(DEBUG) << "TablePrecompiled update operation is successful [key=" << key
+                               << ", entryAddress=" << entryAddress.hex()
+                               << ", conditionAddress=" << conditionAddress.hex() << "]";
+        }
         out = abi.abiIn("", u256(count));
     }
     return out;

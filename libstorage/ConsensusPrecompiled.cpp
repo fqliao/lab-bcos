@@ -38,9 +38,9 @@ contract ConsensusSystemTable
 }
 */
 
-const char* const CSS_METHOD_ADD_MINER = "addMiner(string)";
-const char* const CSS_METHOD_ADD_SER = "addObserver(string)";
-const char* const CSS_METHOD_REMOVE = "remove(string)";
+const std::string CSS_METHOD_ADD_MINER = "addMiner(string)";
+const std::string CSS_METHOD_ADD_SER = "addObserver(string)";
+const std::string CSS_METHOD_REMOVE = "remove(string)";
 
 ConsensusPrecompiled::ConsensusPrecompiled()
 {
@@ -52,13 +52,14 @@ ConsensusPrecompiled::ConsensusPrecompiled()
 bytes ConsensusPrecompiled::call(
     ExecutiveContext::Ptr context, bytesConstRef param, Address const& origin)
 {
-    STORAGE_LOG(TRACE) << "this: " << this << " call CRUD:" << toHex(param);
+    STORAGE_LOG(TRACE) << "this: " << this << " call ConsensusPrecompiled [param=" << toHex(param)
+                       << "]";
 
     // parse function name
     uint32_t func = getParamFunc(param);
     bytesConstRef data = getParamData(param);
 
-    STORAGE_LOG(DEBUG) << "func:" << std::hex << func;
+    STORAGE_LOG(DEBUG) << "ConsensusPrecompiled call [func=" << std::hex << func << "]";
 
     dev::eth::ContractABI abi;
     bytes out;
@@ -74,10 +75,11 @@ bytes ConsensusPrecompiled::call(
         abi.abiOut(data, nodeID);
         // Uniform lowercase nodeID
         boost::to_lower(nodeID);
-        STORAGE_LOG(DEBUG) << "ConsensusPrecompiled addMiner params:" << nodeID;
+        STORAGE_LOG(DEBUG) << "ConsensusPrecompiled addMiner [nodeID=" << nodeID << "]";
         if (nodeID.size() != 128u)
         {
-            STORAGE_LOG(DEBUG) << "ConsensusPrecompiled nodeID length error. " << nodeID;
+            STORAGE_LOG(DEBUG) << "ConsensusPrecompiled nodeID length error [nodeID=" << nodeID
+                               << "]";
         }
         else
         {
@@ -92,25 +94,41 @@ bytes ConsensusPrecompiled::call(
             entry->setField(NODE_KEY_ENABLENUM,
                 boost::lexical_cast<std::string>(context->blockInfo().number + 1));
 
-            if (entries.get())
+            if (entries->size() == 0u)
             {
-                if (entries->size() == 0u)
+                entry->setField(NODE_KEY_NODEID, nodeID);
+                count = table->insert(PRI_KEY, entry, getOptions(origin));
+                if (count == -1)
                 {
-                    entry->setField(NODE_KEY_NODEID, nodeID);
-                    count = table->insert(PRI_KEY, entry, getOptions(origin));
-                    STORAGE_LOG(DEBUG)
-                        << "ConsensusPrecompiled new miner node, nodeID : " << nodeID;
+                    STORAGE_LOG(WARNING)
+                        << "ConsensusPrecompiled addMiner operation is not authorized [origin="
+                        << origin.hex() << "]";
                 }
                 else
                 {
-                    count = table->update(PRI_KEY, entry, condition, getOptions(origin));
                     STORAGE_LOG(DEBUG)
-                        << "ConsensusPrecompiled change to miner, nodeID : " << nodeID;
+                        << "ConsensusPrecompiled addMiner operation is successful [nodeID="
+                        << nodeID << "]";
+                }
+            }
+            else
+            {
+                count = table->update(PRI_KEY, entry, condition, getOptions(origin));
+                if (count == -1)
+                {
+                    STORAGE_LOG(WARNING)
+                        << "ConsensusPrecompiled update miners operation is not authorized [origin="
+                        << origin.hex() << "]";
+                }
+                else
+                {
+                    STORAGE_LOG(DEBUG)
+                        << "ConsensusPrecompiled update miners operation is successful [nodeID="
+                        << nodeID << "]";
                 }
             }
 
             out = abi.abiIn("", count);
-            STORAGE_LOG(DEBUG) << "ConsensusPrecompiled addMiner result:" << toHex(out);
         }
     }
     else if (func == name2Selector[CSS_METHOD_ADD_SER])
@@ -120,10 +138,11 @@ bytes ConsensusPrecompiled::call(
         abi.abiOut(data, nodeID);
         // Uniform lowercase nodeID
         boost::to_lower(nodeID);
-        STORAGE_LOG(DEBUG) << "ConsensusPrecompiled addObserver params:" << nodeID;
+        STORAGE_LOG(DEBUG) << "ConsensusPrecompiled addObserver [nodeID=" << nodeID << "]";
         if (nodeID.size() != 128u)
         {
-            STORAGE_LOG(DEBUG) << "ConsensusPrecompiled nodeID length error. " << nodeID;
+            STORAGE_LOG(DEBUG) << "ConsensusPrecompiled nodeID length error [nodeID=" << nodeID
+                               << "]";
         }
         else
         {
@@ -138,29 +157,41 @@ bytes ConsensusPrecompiled::call(
             entry->setField(NODE_KEY_ENABLENUM,
                 boost::lexical_cast<std::string>(context->blockInfo().number + 1));
 
-            if (entries.get())
+            if (entries->size() == 0u)
             {
-                if (entries->size() == 0u)
+                entry->setField(NODE_KEY_NODEID, nodeID);
+                count = table->insert(PRI_KEY, entry, getOptions(origin));
+                if (count == -1)
                 {
-                    entry->setField(NODE_KEY_NODEID, nodeID);
-                    count = table->insert(PRI_KEY, entry, getOptions(origin));
-                    STORAGE_LOG(DEBUG)
-                        << "ConsensusPrecompiled new observer node, nodeID : " << nodeID;
+                    STORAGE_LOG(WARNING)
+                        << "ConsensusPrecompiled addObserver operation is not authorized [origin="
+                        << origin.hex() << "]";
                 }
-                else if (!checkIsLastMiner(table, nodeID))
+                else
                 {
-                    count = table->update(PRI_KEY, entry, condition, getOptions(origin));
                     STORAGE_LOG(DEBUG)
-                        << "ConsensusPrecompiled change to observer, nodeID : " << nodeID;
+                        << "ConsensusPrecompiled addObserver operation is successful [nodeID="
+                        << nodeID << "]";
                 }
             }
-            else
+            else if (!checkIsLastMiner(table, nodeID))
             {
-                STORAGE_LOG(WARNING) << "ConsensusPrecompiled select SYS_MINERS table failed.";
+                count = table->update(PRI_KEY, entry, condition, getOptions(origin));
+                if (count == -1)
+                {
+                    STORAGE_LOG(WARNING) << "ConsensusPrecompiled update observer operation is not "
+                                            "authorized [origin="
+                                         << origin.hex() << "]";
+                }
+                else
+                {
+                    STORAGE_LOG(DEBUG)
+                        << "ConsensusPrecompiled update observer operation is successful [nodeID="
+                        << nodeID << "]";
+                }
             }
 
             out = abi.abiIn("", count);
-            STORAGE_LOG(DEBUG) << "ConsensusPrecompiled addObserver result:" << toHex(out);
         }
     }
     else if (func == name2Selector[CSS_METHOD_REMOVE])
@@ -170,10 +201,11 @@ bytes ConsensusPrecompiled::call(
         abi.abiOut(data, nodeID);
         // Uniform lowercase nodeID
         boost::to_lower(nodeID);
-        STORAGE_LOG(DEBUG) << "ConsensusPrecompiled remove params:" << nodeID;
+        STORAGE_LOG(DEBUG) << "ConsensusPrecompiled remove [nodeID=" << nodeID << "]";
         if (nodeID.size() != 128u)
         {
-            STORAGE_LOG(DEBUG) << "ConsensusPrecompiled nodeID length error. " << nodeID;
+            STORAGE_LOG(DEBUG) << "ConsensusPrecompiled nodeID length error [nodeID=" << nodeID
+                               << "]";
         }
         else
         {
@@ -184,7 +216,18 @@ bytes ConsensusPrecompiled::call(
                 auto condition = table->newCondition();
                 condition->EQ(NODE_KEY_NODEID, nodeID);
                 count = table->remove(PRI_KEY, condition, getOptions(origin));
-                STORAGE_LOG(DEBUG) << "ConsensusPrecompiled remove one node: " << nodeID;
+                if (count == -1)
+                {
+                    STORAGE_LOG(WARNING)
+                        << "ConsensusPrecompiled remove operation is not authorized [origin="
+                        << origin.hex() << "]";
+                }
+                else
+                {
+                    STORAGE_LOG(DEBUG)
+                        << "ConsensusPrecompiled remove operation is successful [nodeID=" << nodeID
+                        << "]";
+                }
 
                 out = abi.abiIn("", count);
             }
@@ -192,7 +235,7 @@ bytes ConsensusPrecompiled::call(
     }
     else
     {
-        STORAGE_LOG(ERROR) << "ConsensusPrecompiled error func:" << std::hex << func;
+        STORAGE_LOG(ERROR) << "ConsensusPrecompiled error [func=" << std::hex << func << "]";
     }
     return out;
 }
@@ -200,29 +243,21 @@ bytes ConsensusPrecompiled::call(
 void ConsensusPrecompiled::showConsensusTable(ExecutiveContext::Ptr context)
 {
     storage::Table::Ptr table = openTable(context, SYS_MINERS);
-    if (!table)
-    {
-        STORAGE_LOG(WARNING) << "ConsensusPrecompiled open SYS_MINERS table failed.";
-        return;
-    }
 
     auto condition = table->newCondition();
     auto entries = table->select(PRI_KEY, condition);
 
     std::stringstream s;
     s << "ConsensusPrecompiled show table:\n";
-    if (entries.get())
+    for (size_t i = 0; i < entries->size(); i++)
     {
-        for (size_t i = 0; i < entries->size(); i++)
-        {
-            auto entry = entries->get(i);
-            std::string name = entry->getField(PRI_COLUMN);
-            std::string nodeID = entry->getField(NODE_KEY_NODEID);
-            std::string type = entry->getField(NODE_TYPE);
-            std::string enable = entry->getField(NODE_KEY_ENABLENUM);
-            s << "ConsensusPrecompiled[" << i << "]:" << name << "," << nodeID << "," << type << ","
-              << enable << "\n";
-        }
+        auto entry = entries->get(i);
+        std::string name = entry->getField(PRI_COLUMN);
+        std::string nodeID = entry->getField(NODE_KEY_NODEID);
+        std::string type = entry->getField(NODE_TYPE);
+        std::string enable = entry->getField(NODE_KEY_ENABLENUM);
+        s << "ConsensusPrecompiled[" << i << "]:" << name << "," << nodeID << "," << type << ","
+          << enable << "\n";
     }
     STORAGE_LOG(TRACE) << s.str();
 }

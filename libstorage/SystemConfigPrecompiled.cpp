@@ -30,7 +30,7 @@ using namespace dev::blockverifier;
 using namespace dev::storage;
 
 
-const char* const SYSCONFIG_METHOD_SET_STR = "setValueByKey(string,string)";
+const std::string SYSCONFIG_METHOD_SET_STR = "setValueByKey(string,string)";
 
 SystemConfigPrecompiled::SystemConfigPrecompiled()
 {
@@ -40,13 +40,14 @@ SystemConfigPrecompiled::SystemConfigPrecompiled()
 bytes SystemConfigPrecompiled::call(
     ExecutiveContext::Ptr context, bytesConstRef param, Address const& origin)
 {
-    STORAGE_LOG(TRACE) << "this: " << this << " call SystemConfig:" << toHex(param);
+    STORAGE_LOG(TRACE) << "this: " << this
+                       << " call SystemConfigPrecompiled [param=" << toHex(param) << "]";
 
     // parse function name
     uint32_t func = getParamFunc(param);
     bytesConstRef data = getParamData(param);
 
-    STORAGE_LOG(DEBUG) << "func:" << std::hex << func;
+    STORAGE_LOG(DEBUG) << "SystemConfigPrecompiled call [func=" << std::hex << func << "]";
 
     dev::eth::ContractABI abi;
     bytes out;
@@ -72,30 +73,44 @@ bytes SystemConfigPrecompiled::call(
         entry->setField(SYSTEM_CONFIG_ENABLENUM,
             boost::lexical_cast<std::string>(context->blockInfo().number + 1));
 
-        if (entries.get())
+        if (entries->size() == 0u)
         {
-            if (entries->size() == 0u)
+            count = table->insert(configKey, entry, getOptions(origin));
+            if (count == -1)
             {
-                count = table->insert(configKey, entry, getOptions(origin));
-                STORAGE_LOG(DEBUG) << "SystemConfigPrecompiled insert config key successfully.";
+                STORAGE_LOG(WARNING)
+                    << "SystemConfigPrecompiled insert operation is not authorized [origin="
+                    << origin.hex() << "]";
             }
             else
             {
-                count = table->update(configKey, entry, condition, getOptions(origin));
-                STORAGE_LOG(DEBUG) << "SystemConfigPrecompiled update config key successfully.";
+                STORAGE_LOG(DEBUG)
+                    << "SystemConfigPrecompiled insert operation is successful [configKey="
+                    << configKey << ", configValue=" << configValue << "]";
             }
         }
         else
         {
-            STORAGE_LOG(WARNING) << "SystemConfigPrecompiled select SYS_CONFIG table failed.";
+            count = table->update(configKey, entry, condition, getOptions(origin));
+            if (count == -1)
+            {
+                STORAGE_LOG(WARNING)
+                    << "SystemConfigPrecompiled update operation is not authorized [origin="
+                    << origin.hex() << "]";
+            }
+            else
+            {
+                STORAGE_LOG(DEBUG)
+                    << "SystemConfigPrecompiled update operation is successful [configKey="
+                    << configKey << ", configValue=" << configValue << "]";
+            }
         }
 
         out = abi.abiIn("", count);
-        STORAGE_LOG(DEBUG) << "SystemConfigPrecompiled setValueByKey result:" << toHex(out);
     }
     else
     {
-        STORAGE_LOG(ERROR) << "SystemConfigPrecompiled error func:" << std::hex << func;
+        STORAGE_LOG(ERROR) << "SystemConfigPrecompiled error [func=" << std::hex << func << "]";
     }
     return out;
 }

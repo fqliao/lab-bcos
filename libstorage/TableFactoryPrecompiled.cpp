@@ -34,8 +34,8 @@ using namespace dev::blockverifier;
 using namespace std;
 using namespace dev::storage;
 
-const char* const TABLE_METHOD_OPT_STR = "openTable(string)";
-const char* const TABLE_METHOD_CRT_STR_STR = "createTable(string,string,string)";
+const std::string TABLE_METHOD_OPT_STR = "openTable(string)";
+const std::string TABLE_METHOD_CRT_STR_STR = "createTable(string,string,string)";
 
 TableFactoryPrecompiled::TableFactoryPrecompiled()
 {
@@ -51,13 +51,14 @@ std::string TableFactoryPrecompiled::toString(std::shared_ptr<ExecutiveContext>)
 bytes TableFactoryPrecompiled::call(
     ExecutiveContext::Ptr context, bytesConstRef param, Address const& origin)
 {
-    STORAGE_LOG(DEBUG) << "this: " << this << " call TableFactory:" << toHex(param);
+    STORAGE_LOG(DEBUG) << "this: " << this
+                       << " call TableFactoryPrecompiled [param=" << toHex(param) << "]";
 
 
     uint32_t func = getParamFunc(param);
     bytesConstRef data = getParamData(param);
 
-    STORAGE_LOG(DEBUG) << "func:" << hex << func;
+    STORAGE_LOG(DEBUG) << "TableFactoryPrecompiled call [func=" << std::hex << func << "]";
 
     dev::eth::ContractABI abi;
     bytes out;
@@ -100,8 +101,20 @@ bytes TableFactoryPrecompiled::call(
         auto table =
             m_memoryTableFactory->createTable(tableName, keyField, valueFiled, true, origin);
         // set createTableCode
-        int errorCode = m_memoryTableFactory->getCreateTableCode();
-        out = abi.abiIn("", u256(errorCode));
+        int createTableCode = m_memoryTableFactory->getCreateTableCode();
+        if (createTableCode == -1)
+        {
+            STORAGE_LOG(WARNING)
+                << "TableFactoryPrecompiled createTable operation is not authorized [origin="
+                << origin.hex() << "]";
+        }
+        else
+        {
+            STORAGE_LOG(DEBUG)
+                << "TableFactoryPrecompiled createTable operation is successful [tableName="
+                << tableName << "]";
+        }
+        out = abi.abiIn("", createTableCode);
     }
     return out;
 }

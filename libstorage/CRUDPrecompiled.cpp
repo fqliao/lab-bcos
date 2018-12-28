@@ -29,7 +29,7 @@ using namespace dev;
 using namespace dev::blockverifier;
 using namespace dev::storage;
 
-const char* const CRUD_METHOD_SLT_STR_STR = "select(string,string)";
+const std::string CRUD_METHOD_SLT_STR_STR = "select(string,string)";
 
 CRUDPrecompiled::CRUDPrecompiled()
 {

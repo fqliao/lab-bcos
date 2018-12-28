@@ -31,9 +31,9 @@ using namespace dev::blockverifier;
 using namespace dev::storage;
 
 
-const char* const AUP_METHOD_INS = "insert(string,string)";
-const char* const AUP_METHOD_REM = "remove(string,string)";
-const char* const AUP_METHOD_QUE = "queryByName(string)";
+const std::string AUP_METHOD_INS = "insert(string,string)";
+const std::string AUP_METHOD_REM = "remove(string,string)";
+const std::string AUP_METHOD_QUE = "queryByName(string)";
 
 
 AuthorityPrecompiled::AuthorityPrecompiled()
@@ -52,7 +52,7 @@ std::string AuthorityPrecompiled::toString(ExecutiveContext::Ptr)
 storage::Table::Ptr AuthorityPrecompiled::openTable(
     ExecutiveContext::Ptr context, const std::string& tableName)
 {
-    STORAGE_LOG(DEBUG) << "Authority open table:" << tableName;
+    STORAGE_LOG(DEBUG) << "AuthorityPrecompiled open table:" << tableName;
     TableFactoryPrecompiled::Ptr tableFactoryPrecompiled =
         std::dynamic_pointer_cast<TableFactoryPrecompiled>(
             context->getPrecompiled(Address(0x1001)));
@@ -62,13 +62,14 @@ storage::Table::Ptr AuthorityPrecompiled::openTable(
 bytes AuthorityPrecompiled::call(
     ExecutiveContext::Ptr context, bytesConstRef param, Address const& origin)
 {
-    STORAGE_LOG(TRACE) << "this: " << this << " call Authority:" << toHex(param);
+    STORAGE_LOG(TRACE) << "this: " << this << " call AuthorityPrecompiled [param=" << toHex(param)
+                       << "]";
 
     // parse function name
     uint32_t func = getParamFunc(param);
     bytesConstRef data = getParamData(param);
 
-    STORAGE_LOG(DEBUG) << "func:" << std::hex << func;
+    STORAGE_LOG(DEBUG) << "AuthorityPrecompiled call [func=" << std::hex << func << "]";
 
     dev::eth::ContractABI abi;
     bytes out;
@@ -88,10 +89,9 @@ bytes AuthorityPrecompiled::call(
         auto entries = table->select(tableName, condition);
         if (entries->size() != 0u)
         {
-            STORAGE_LOG(DEBUG)
-                << "Authority entry with the same tableName and address has existed,  tableName : "
-                << tableName << "address: " << addr;
-            out = abi.abiIn("", u256(0));
+            STORAGE_LOG(DEBUG) << "The tableName and address already exist [tableName=" << tableName
+                               << ", address=" << addr << "]";
+            out = abi.abiIn("", 0);
         }
         else
         {
@@ -101,9 +101,19 @@ bytes AuthorityPrecompiled::call(
             entry->setField(SYS_AC_ENABLENUM,
                 boost::lexical_cast<std::string>(context->blockInfo().number + 1));
             int count = table->insert(tableName, entry, getOptions(origin));
-            out = abi.abiIn("", u256(count));
-            STORAGE_LOG(DEBUG) << "AuthorityPrecompiled add a record, tableName : " << tableName
-                               << "address: " << addr;
+            if (count == -1)
+            {
+                STORAGE_LOG(WARNING)
+                    << "AuthorityPrecompiled insert operation is not authorized [origin="
+                    << origin.hex() << "]";
+            }
+            else
+            {
+                STORAGE_LOG(DEBUG)
+                    << "AuthorityPrecompiled insert operation is successful [tableName="
+                    << tableName << ", address=" << addr << "]";
+            }
+            out = abi.abiIn("", count);
         }
     }
     else if (func == name2Selector[AUP_METHOD_REM])
@@ -121,14 +131,26 @@ bytes AuthorityPrecompiled::call(
         auto entries = table->select(tableName, condition);
         if (entries->size() == 0u)
         {
-            STORAGE_LOG(WARNING)
-                << "Authority entry with the table name and address does not existed.";
+            STORAGE_LOG(WARNING) << "The tableName and address does not exist [tableName="
+                                 << tableName << ", address=" << addr << "]";
             out = abi.abiIn("", u256(0));
         }
         else
         {
             int count = table->remove(tableName, condition, getOptions(origin));
-            out = abi.abiIn("", u256(count));
+            if (count == -1)
+            {
+                STORAGE_LOG(WARNING)
+                    << "AuthorityPrecompiled remove operation is not authorized, origin: "
+                    << origin.hex();
+            }
+            else
+            {
+                STORAGE_LOG(DEBUG)
+                    << "AuthorityPrecompiled remove operation is successful [tableName="
+                    << tableName << ", address=" << addr << "]";
+            }
+            out = abi.abiIn("", count);
         }
     }
     else if (func == name2Selector[AUP_METHOD_QUE])
@@ -164,7 +186,7 @@ bytes AuthorityPrecompiled::call(
     }
     else
     {
-        STORAGE_LOG(ERROR) << "error func:" << std::hex << func;
+        STORAGE_LOG(ERROR) << "AuthorityPrecompiled error [func=" << std::hex << func << "]";
     }
     return out;
 }
