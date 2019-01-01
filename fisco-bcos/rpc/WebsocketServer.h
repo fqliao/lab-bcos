@@ -37,7 +37,6 @@
 #include <map>
 #include <string>
 
-
 using tcp = boost::asio::ip::tcp;
 namespace websocket = boost::beast::websocket;
 using namespace dev;

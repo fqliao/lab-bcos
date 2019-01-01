@@ -114,7 +114,7 @@ bytes TableFactoryPrecompiled::call(
                 << "TableFactoryPrecompiled createTable operation is successful [tableName="
                 << tableName << "]";
         }
-        out = abi.abiIn("", createTableCode);
+        out = abi.abiIn("", u256(createTableCode));
     }
     return out;
 }

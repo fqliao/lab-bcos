@@ -53,7 +53,6 @@ bytes SystemConfigPrecompiled::call(
     bytes out;
     u256 count = 0;
 
-
     if (func == name2Selector[SYSCONFIG_METHOD_SET_STR])
     {
         // setValueByKey(string,string)
@@ -62,6 +61,15 @@ bytes SystemConfigPrecompiled::call(
         // Uniform lowercase configKey
         boost::to_lower(configKey);
         STORAGE_LOG(DEBUG) << "SystemConfigPrecompiled params:" << configKey << ", " << configValue;
+
+        if (!checkValueValid(configKey, configValue))
+        {
+            // The transaction returns 0, indicating that the system config setting failed.
+            out = abi.abiIn("", 0);
+            STORAGE_LOG(WARNING) << "SystemConfigPrecompiled set invalid value [configKey="
+                                 << configKey << ", configValue=" << configValue << "]";
+            return out;
+        }
 
         storage::Table::Ptr table = openTable(context, SYS_CONFIG);
 
@@ -113,4 +121,17 @@ bytes SystemConfigPrecompiled::call(
         STORAGE_LOG(ERROR) << "SystemConfigPrecompiled error [func=" << std::hex << func << "]";
     }
     return out;
+}
+
+bool SystemConfigPrecompiled::checkValueValid(std::string const& key, std::string const& value)
+{
+    if (SYSTEM_KEY_TX_COUNT_LIMIT == key)
+    {
+        return (boost::lexical_cast<uint64_t>(value) >= TX_COUNT_LIMIT_MIN);
+    }
+    else if (SYSTEM_KEY_TX_GAS_LIMIT == key)
+    {
+        return (boost::lexical_cast<uint64_t>(value) >= TX_GAS_LIMIT_MIN);
+    }
+    return true;
 }
